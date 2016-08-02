@@ -1,25 +1,95 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "Drew Owen"
+date: "July 25, 2016"
+output: html_document
 ---
+This is is my submission for course project 1 of reproducible research. I chose the base plotting system because it is available on every R system and thus is universal to all users.
+
+##Loading and Processing data
+```{r Downloading and Importing Activity Data to R, cache=TRUE,echo=TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip","activity_data.zip")
+unzip("activity_data.zip")
+act<-read.csv("activity.csV")
+head(act)
+
+```
 
 
-## Loading and preprocessing the data
+##What is mean total number of steps taken per day?
+Now that data is loaded into R som basic analysis can be performed. First all, the steps from individual days are summed according to the day.
+```{r Steps per day analysis, cache=TRUE,echo=TRUE}
+steps_per_day<-aggregate(steps~date,act, sum)
+head(steps_per_day)
+```
+aggregate default is to ignore NA so nothing needs to be specified in sum.
 
+```{r Histogram of Step Data, cache=TRUE,echo=TRUE}
+hist(steps_per_day$steps, breaks = 10, col =2, xlab = "Number of Steps per Day", main = "Histogram of Steps per Day")
+```
 
+Some basic stats regarding the per day data.
+```{r Mean and Median of steps per day, cache=TRUE,echo=TRUE}
+mean(steps_per_day$steps)
+median(steps_per_day$steps)
+```
 
-## What is mean total number of steps taken per day?
+##What is the average daily activity pattern?
+Each day is broken up into a series of five minute intervals. The data for each time interval can be averaged across different days to identify what time of the day had the most number of steps.
 
+```{r Steps per Interval, averaged over all days, cache=TRUE, echo=TRUE}
+steps_per_int<-aggregate(steps~interval,act, mean)
+plot(steps_per_int$interval/100, steps_per_int$steps, type= "l", xlab="hour of the day", ylab = "average steps",main= "Average steps during a day")
+```
 
+The divide by 100 in the x variable scales the interval vector so the x axis units become hours.
 
-## What is the average daily activity pattern?
+```{r Time interval with most steps in a day, cache=TRUE, echo=TRUE}
+steps_per_int$interval[which(steps_per_int$steps==max(steps_per_int$steps))] 
+#read as hhmm
+```
 
+##Imputing missing values
+However, many of the days from the original data set had no value and were listed as NA.
+```{r Number of rows with NA value in Steps,cache=TRUE,echo=TRUE}
+na<-is.na(act$steps)
+sum(na)
+```
 
+These values were replaced using a simple for loop, with the average steps for those intervals using the previously calculated data. A new data frame was created to contain these modifications.
 
-## Imputing missing values
+```{r Find and replace empty data cells,cache=TRUE,echo=TRUE}
+act2<-act
+index_na<-which(na)
+for (i in 1:sum(na)){
+      int<-act2$interval[index_na[i]]
+      act2$steps[index_na[i]]<-steps_per_int$steps[steps_per_int$interval==int]
+}
+steps_per_day2<-aggregate(steps~date,act2, sum)
+hist(steps_per_day$steps, breaks = 10, col=rgb(1,0,0,0.5), xlab = "Number of Steps per Day", main = "Histogram of Steps per Day using both methods",sub="Red ori", ylim=c(0,25))
+hist(steps_per_day2$steps, breaks = 10, col=rgb(0,0,1,0.5), add=T)
+legend("topright", c("Original", "Replaced NAs", "Overlap"), col=c("red","blue", "purple"), lwd=10)
+```
+Removing the NAs and replacing them with actual numbers just increased the number of total days measured when using aggregate(). The increase in the center of the histogram was because the NAs were replaced with the average values.
 
+```{r Mean and Median steps per day with replaced,cache=TRUE,echo=TRUE}
+mean(steps_per_day2$steps)
+median(steps_per_day2$steps)
+```
+Notice the mean does not change at all. This is because the previous method used aggregate() with the default setting of na.action=na.omit. The replacement only added the mean back to the original dataset. The median changed because the total number of steps per day has been increased.
 
+##Are there differences in activity patterns between weekdays and weekends?
+```{r Assigning Factor of either weekend or weekday,cache=TRUE,echo=TRUE}
+act2$dayend<-factor(weekdays(as.Date(act2$date))=="Saturday"|weekdays(as.Date(act2$date))=="Sunday",c("TRUE", "FALSE"),c("Weekend","Weekday"))
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+This assigns a factor to each entry designating it as either Weekend or Weekday.
+
+```{r  Finding average interval,cache=TRUE,echo=TRUE}
+steps_per_int2<-aggregate(steps~interval + dayend,act2, mean)
+par(mfrow=c(2,1))
+plot(steps_per_int2$interval[steps_per_int2$dayend=="Weekday"]/100, steps_per_int2$steps[steps_per_int2$dayend=="Weekday"], type= "l",xlab="hour of the day", ylab = "average steps", main="Weekday", ylim=c(0,max(steps_per_int2$steps)))
+plot(steps_per_int2$interval[steps_per_int2$dayend=="Weekend"]/100, steps_per_int2$steps[steps_per_int2$dayend=="Weekend"], type= "l", xlab="hour of the day", ylab = "average steps", main="Weekend", ylim=c(0,max(steps_per_int2$steps)))
+
+```
+
